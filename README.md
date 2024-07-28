@@ -39,22 +39,17 @@ Once the CLI is running, you can use the following commands:
 ### Examples
 
 ```sh
-set mykey myvalue
+> set mykey myvalue
 Value set successfully
-
-get mykey
+> get mykey
 myvalue
-
-list my*
+> list my*
 mykey
-
-delete mykey
+> delete mykey
 Value deleted successfully
-
-list
+> list
 No matching keys found
-
-exit
+> exit
 ```
 
 ## Glob Pattern Matching
