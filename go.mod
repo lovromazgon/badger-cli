@@ -3,6 +3,7 @@ module github.com/lovromazgon/badger-cli
 go 1.22.3
 
 require (
+	github.com/chzyer/readline v1.5.1
 	github.com/dgraph-io/badger/v4 v4.2.0
 	github.com/gobwas/glob v0.2.3
 )

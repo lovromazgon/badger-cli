@@ -1,12 +1,12 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"log"
 	"os"
 	"strings"
 
+	"github.com/chzyer/readline"
 	"github.com/dgraph-io/badger/v4"
 	"github.com/gobwas/glob"
 )
@@ -28,11 +28,19 @@ func main() {
 	}
 	defer db.Close()
 
+	// Set up readline
+	rl, err := readline.New("> ")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer rl.Close()
+
 	// Start the CLI loop
-	reader := bufio.NewReader(os.Stdin)
 	for {
-		fmt.Print("> ")
-		input, _ := reader.ReadString('\n')
+		input, err := rl.Readline()
+		if err != nil { // io.EOF, readline.ErrInterrupt
+			break
+		}
 		input = strings.TrimSpace(input)
 
 		if input == "exit" {
@@ -109,7 +117,6 @@ func listKeys(db *badger.DB, pattern string) {
 		}
 		return nil
 	})
-
 	if err != nil {
 		fmt.Printf("Error listing keys: %v\n", err)
 	}
