@@ -14,11 +14,19 @@ a fast key-value database written in Go.
 
 ## Installation
 
-To install `badger-cli`, make sure you have Go installed on your system, then run:
+Install using homebrew:
+
+```sh
+brew install lovromazgon/tap/badger-cli
+```
+
+Or build it from source using Go:
 
 ```sh
 go install github.com/lovromazgon/badger-cli
 ```
+
+Or download the binary manually from the [latest release](https://github.com/lovromazgon/badger-cli/releases/latest).
 
 ## Usage
 
