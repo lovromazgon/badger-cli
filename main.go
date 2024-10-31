@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"log"
 	"os"
@@ -28,8 +29,14 @@ func main() {
 	}
 	defer db.Close()
 
-	// Set up readline
-	rl, err := readline.New("> ")
+	// Create a custom completer
+	completer := createDatabaseCompleter(db)
+
+	// Set up readline with the custom completer
+	rl, err := readline.NewEx(&readline.Config{
+		Prompt:       "> ",
+		AutoComplete: completer,
+	})
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -49,6 +56,62 @@ func main() {
 
 		handleCommand(db, input)
 	}
+}
+
+// createDatabaseCompleter creates a dynamic completer for database keys
+func createDatabaseCompleter(db *badger.DB) readline.AutoCompleter {
+	return readline.NewPrefixCompleter(
+		readline.PcItem("get",
+			readline.PcItemDynamic(func(line string) []string {
+				return getDatabaseKeys(db, line)
+			}),
+		),
+		readline.PcItem("set"),
+		readline.PcItem("delete",
+			readline.PcItemDynamic(func(line string) []string {
+				return getDatabaseKeys(db, line)
+			}),
+		),
+		readline.PcItem("list"),
+	)
+}
+
+// getDatabaseKeys retrieves keys from the database for autocomplete
+func getDatabaseKeys(db *badger.DB, line string) []string {
+	// Only provide completions if the line starts with "get" or "delete"
+	if len(line) < 4 || (string(line[:4]) != "get " && string(line[:7]) != "delete ") {
+		return nil
+	}
+
+	// Store found keys
+	var keys []string
+
+	// Retrieve keys from the database
+	err := db.View(func(txn *badger.Txn) error {
+		opts := badger.DefaultIteratorOptions
+		opts.PrefetchValues = false
+		it := txn.NewIterator(opts)
+		defer it.Close()
+
+		// Convert current line to a prefix for matching
+		prefix := []byte(line[strings.LastIndexAny(line, " ")+1:])
+
+		for it.Rewind(); it.Valid(); it.Next() {
+			key := it.Item().Key()
+
+			// Only add keys that start with the current prefix
+			if bytes.HasPrefix(key, prefix) {
+				keys = append(keys, string(key))
+			}
+		}
+		return nil
+	})
+
+	if err != nil {
+		return nil
+	}
+
+	return keys
 }
 
 func handleCommand(db *badger.DB, input string) {
