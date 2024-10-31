@@ -66,7 +66,11 @@ func createDatabaseCompleter(db *badger.DB) readline.AutoCompleter {
 				return getDatabaseKeys(db, line)
 			}),
 		),
-		readline.PcItem("set"),
+		readline.PcItem("set",
+			readline.PcItemDynamic(func(line string) []string {
+				return getDatabaseKeys(db, line)
+			}),
+		),
 		readline.PcItem("delete",
 			readline.PcItemDynamic(func(line string) []string {
 				return getDatabaseKeys(db, line)
@@ -78,11 +82,6 @@ func createDatabaseCompleter(db *badger.DB) readline.AutoCompleter {
 
 // getDatabaseKeys retrieves keys from the database for autocomplete
 func getDatabaseKeys(db *badger.DB, line string) []string {
-	// Only provide completions if the line starts with "get" or "delete"
-	if len(line) < 4 || (string(line[:4]) != "get " && string(line[:7]) != "delete ") {
-		return nil
-	}
-
 	// Store found keys
 	var keys []string
 
