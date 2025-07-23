@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -13,28 +14,32 @@ import (
 )
 
 func main() {
-	// Set default path and check for command-line argument
-	var dbPath string
-	if len(os.Args) > 1 {
-		dbPath = os.Args[1]
-	}
-	if dbPath == "" {
-		log.Fatal("Please supply a path to a badger database")
-	}
+	// Parse command line arguments
+	dbPath, readonly := parseFlags()
 
 	// Open the Badger database
-	db, err := badger.Open(badger.DefaultOptions(dbPath))
+	opts := badger.DefaultOptions(dbPath)
+	if readonly {
+		opts.ReadOnly = true
+	}
+
+	db, err := badger.Open(opts)
 	if err != nil {
 		log.Fatalf("Error opening database: %v\n", err)
 	}
 	defer db.Close()
 
 	// Create a custom completer
-	completer := createDatabaseCompleter(db)
+	completer := createDatabaseCompleter(db, readonly)
 
 	// Set up readline with the custom completer
+	prompt := "> "
+	if readonly {
+		prompt = "[READONLY] > "
+	}
+
 	rl, err := readline.NewEx(&readline.Config{
-		Prompt:       "> ",
+		Prompt:       prompt,
 		AutoComplete: completer,
 	})
 	if err != nil {
@@ -54,30 +59,85 @@ func main() {
 			break
 		}
 
-		handleCommand(db, input)
+		handleCommand(db, input, readonly)
 	}
 }
 
+func parseFlags() (string, bool) {
+	var readonly bool
+	var help bool
+
+	flag.BoolVar(&readonly, "r", false, "Open database in read-only mode")
+	flag.BoolVar(&readonly, "readonly", false, "Open database in read-only mode")
+	flag.BoolVar(&help, "h", false, "Show help")
+	flag.BoolVar(&help, "help", false, "Show help")
+
+	const usage = `Usage: badger-cli [options] <database_path>
+
+A command-line interface for a Badger key-value database.
+
+Options:
+    -r, --readonly  Open database in read-only mode
+    -h, --help      Show help
+
+Examples:
+    badger-cli /path/to/db
+    badger-cli --readonly /path/to/db
+`
+
+	flag.Usage = func() { fmt.Fprint(os.Stderr, usage) }
+	flag.Parse()
+
+	if help {
+		flag.Usage()
+		os.Exit(0)
+	}
+
+	// Get the non-flag arguments (database path)
+	dbPathValid := false
+	switch {
+	case flag.NArg() > 1:
+		fmt.Fprint(os.Stderr, "too many arguments, expected a single database path\n")
+	case flag.Arg(0) == "":
+		fmt.Fprint(os.Stderr, "missing database path argument\n")
+	default:
+		dbPathValid = true
+	}
+
+	if !dbPathValid {
+		flag.Usage()
+		os.Exit(1)
+	}
+
+	return flag.Arg(0), readonly
+}
+
 // createDatabaseCompleter creates a dynamic completer for database keys
-func createDatabaseCompleter(db *badger.DB) readline.AutoCompleter {
-	return readline.NewPrefixCompleter(
+func createDatabaseCompleter(db *badger.DB, readonly bool) readline.AutoCompleter {
+	items := []readline.PrefixCompleterInterface{
 		readline.PcItem("get",
 			readline.PcItemDynamic(func(line string) []string {
 				return getDatabaseKeys(db, line)
 			}),
 		),
-		readline.PcItem("set",
-			readline.PcItemDynamic(func(line string) []string {
-				return getDatabaseKeys(db, line)
-			}),
-		),
-		readline.PcItem("delete",
-			readline.PcItemDynamic(func(line string) []string {
-				return getDatabaseKeys(db, line)
-			}),
-		),
 		readline.PcItem("list"),
-	)
+	}
+
+	// Only add write commands if not in readonly mode
+	if !readonly {
+		items = append(items, readline.PcItem("set",
+			readline.PcItemDynamic(func(line string) []string {
+				return getDatabaseKeys(db, line)
+			}),
+		))
+		items = append(items, readline.PcItem("delete",
+			readline.PcItemDynamic(func(line string) []string {
+				return getDatabaseKeys(db, line)
+			}),
+		))
+	}
+
+	return readline.NewPrefixCompleter(items...)
 }
 
 // getDatabaseKeys retrieves keys from the database for autocomplete
@@ -113,7 +173,7 @@ func getDatabaseKeys(db *badger.DB, line string) []string {
 	return keys
 }
 
-func handleCommand(db *badger.DB, input string) {
+func handleCommand(db *badger.DB, input string, readonly bool) {
 	parts := strings.Fields(input)
 	if len(parts) == 0 {
 		return
@@ -130,12 +190,20 @@ func handleCommand(db *badger.DB, input string) {
 		}
 		getValue(db, args[0])
 	case "set":
+		if readonly {
+			fmt.Println("Error: Cannot set values in read-only mode")
+			return
+		}
 		if len(args) != 2 {
 			fmt.Println("Usage: set <key> <value>")
 			return
 		}
 		setValue(db, args[0], args[1])
 	case "delete":
+		if readonly {
+			fmt.Println("Error: Cannot delete values in read-only mode")
+			return
+		}
 		if len(args) != 1 {
 			fmt.Println("Usage: delete <key>")
 			return
@@ -148,7 +216,11 @@ func handleCommand(db *badger.DB, input string) {
 		}
 		listKeys(db, pattern)
 	default:
-		fmt.Println("Unknown command. Available commands: get, set, delete, list")
+		if readonly {
+			fmt.Println("Unknown command. Available commands: get, list")
+		} else {
+			fmt.Println("Unknown command. Available commands: get, set, delete, list")
+		}
 	}
 }
 
