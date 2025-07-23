@@ -6,6 +6,8 @@
 `badger-cli` is a simple command-line interface for interacting with [Badger DB](https://github.com/dgraph-io/badger), 
 a fast key-value database written in Go.
 
+![demo](https://github.com/user-attachments/assets/370d3b7a-b4b7-49f0-9ff9-b1279ddb8181)
+
 ## Features
 
 - Connect to an existing Badger DB
@@ -52,16 +54,9 @@ Examples:
 To open the database in read-only mode (useful for inspecting production databases safely):
 
 ```sh
-badger-cli -readonly /path/to/your/badger/db
-# or
 badger-cli --readonly /path/to/your/badger/db
-```
-
-**Note**: The order of arguments is flexible. You can place the readonly flag before or after the database path:
-
-```sh
-badger-cli -readonly /path/to/your/badger/db
-badger-cli /path/to/your/badger/db -readonly
+# or
+badger-cli -r /path/to/your/badger/db
 ```
 
 In read-only mode:
