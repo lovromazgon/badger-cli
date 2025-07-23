@@ -31,10 +31,20 @@ Or download the binary manually from the [latest release](https://github.com/lov
 
 ## Usage
 
-Run the CLI by providing the path to your Badger database:
-
 ```sh
-badger-cli /path/to/your/badger/db
+$ badger-cli -h
+
+Usage: badger-cli [options] <database_path>
+
+A command-line interface for a Badger key-value database.
+
+Options:
+    -r, --readonly  Open database in read-only mode
+    -h, --help      Show help
+
+Examples:
+    badger-cli /path/to/db
+    badger-cli --readonly /path/to/db
 ```
 
 ### Read-only Mode

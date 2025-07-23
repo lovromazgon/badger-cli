@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -14,26 +15,7 @@ import (
 
 func main() {
 	// Parse command line arguments
-	var readonly bool
-	var dbPath string
-
-	args := os.Args[1:] // Skip program name
-
-	for i := 0; i < len(args); i++ {
-		arg := args[i]
-		if arg == "-readonly" || arg == "--readonly" {
-			readonly = true
-		} else if !strings.HasPrefix(arg, "-") {
-			// First non-flag argument is the database path
-			if dbPath == "" {
-				dbPath = arg
-			}
-		}
-	}
-
-	if dbPath == "" {
-		log.Fatal("Please supply a path to a badger database")
-	}
+	dbPath, readonly := parseFlags()
 
 	// Open the Badger database
 	opts := badger.DefaultOptions(dbPath)
@@ -79,6 +61,55 @@ func main() {
 
 		handleCommand(db, input, readonly)
 	}
+}
+
+func parseFlags() (string, bool) {
+	var readonly bool
+	var help bool
+
+	flag.BoolVar(&readonly, "r", false, "Open database in read-only mode")
+	flag.BoolVar(&readonly, "readonly", false, "Open database in read-only mode")
+	flag.BoolVar(&help, "h", false, "Show help")
+	flag.BoolVar(&help, "help", false, "Show help")
+
+	const usage = `Usage: badger-cli [options] <database_path>
+
+A command-line interface for a Badger key-value database.
+
+Options:
+    -r, --readonly  Open database in read-only mode
+    -h, --help      Show help
+
+Examples:
+    badger-cli /path/to/db
+    badger-cli --readonly /path/to/db
+`
+
+	flag.Usage = func() { fmt.Fprint(os.Stderr, usage) }
+	flag.Parse()
+
+	if help {
+		flag.Usage()
+		os.Exit(0)
+	}
+
+	// Get the non-flag arguments (database path)
+	dbPathValid := false
+	switch {
+	case flag.NArg() > 1:
+		fmt.Fprint(os.Stderr, "too many arguments, expected a single database path\n")
+	case flag.Arg(0) == "":
+		fmt.Fprint(os.Stderr, "missing database path argument\n")
+	default:
+		dbPathValid = true
+	}
+
+	if !dbPathValid {
+		flag.Usage()
+		os.Exit(1)
+	}
+
+	return flag.Arg(0), readonly
 }
 
 // createDatabaseCompleter creates a dynamic completer for database keys
