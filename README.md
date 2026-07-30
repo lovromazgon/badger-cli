@@ -14,6 +14,7 @@ a fast key-value database written in Go.
 - Get, set, and delete key-value pairs
 - List keys with optional glob pattern matching
 - Read-only mode for safe database inspection
+- Bypass the directory lock to inspect databases already open by another process
 
 ## Installation
 
@@ -41,12 +42,14 @@ Usage: badger-cli [options] <database_path>
 A command-line interface for a Badger key-value database.
 
 Options:
-    -r, --readonly  Open database in read-only mode
-    -h, --help      Show help
+    -r, --readonly       Open database in read-only mode
+    -b, --bypass-lock    Skip the Badger directory lock (requires --readonly)
+    -h, --help           Show help
 
 Examples:
     badger-cli /path/to/db
     badger-cli --readonly /path/to/db
+    badger-cli --readonly --bypass-lock /path/to/db
 ```
 
 ### Read-only Mode
@@ -66,6 +69,18 @@ In read-only mode:
 - The database is opened with read-only permissions
 - The database must already exist (will not create new databases)
 - If the database is already in use by another process, you may need to run without -readonly first to ensure proper initialization
+
+To inspect a database that another process currently has open, add the
+`--bypass-lock` (`-b`) flag to skip Badger's directory lock:
+
+```sh
+badger-cli --readonly --bypass-lock /path/to/your/badger/db
+# or
+badger-cli -r -b /path/to/your/badger/db
+```
+
+This flag can only be used together with `--readonly`, since bypassing the lock
+for writable access is unsafe.
 
 Once the CLI is running, you can use the following commands:
 
