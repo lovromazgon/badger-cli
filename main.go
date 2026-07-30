@@ -15,12 +15,15 @@ import (
 
 func main() {
 	// Parse command line arguments
-	dbPath, readonly := parseFlags()
+	dbPath, readonly, bypassLock := parseFlags()
 
 	// Open the Badger database
 	opts := badger.DefaultOptions(dbPath)
 	if readonly {
 		opts.ReadOnly = true
+	}
+	if bypassLock {
+		opts.BypassLockGuard = true
 	}
 
 	db, err := badger.Open(opts)
@@ -63,12 +66,15 @@ func main() {
 	}
 }
 
-func parseFlags() (string, bool) {
+func parseFlags() (string, bool, bool) {
 	var readonly bool
+	var bypassLock bool
 	var help bool
 
 	flag.BoolVar(&readonly, "r", false, "Open database in read-only mode")
 	flag.BoolVar(&readonly, "readonly", false, "Open database in read-only mode")
+	flag.BoolVar(&bypassLock, "b", false, "Skip the Badger directory lock (requires --readonly)")
+	flag.BoolVar(&bypassLock, "bypass-lock", false, "Skip the Badger directory lock (requires --readonly)")
 	flag.BoolVar(&help, "h", false, "Show help")
 	flag.BoolVar(&help, "help", false, "Show help")
 
@@ -77,12 +83,14 @@ func parseFlags() (string, bool) {
 A command-line interface for a Badger key-value database.
 
 Options:
-    -r, --readonly  Open database in read-only mode
-    -h, --help      Show help
+    -r, --readonly       Open database in read-only mode
+    -b, --bypass-lock    Skip the Badger directory lock (requires --readonly)
+    -h, --help           Show help
 
 Examples:
     badger-cli /path/to/db
     badger-cli --readonly /path/to/db
+    badger-cli --readonly --bypass-lock /path/to/db
 `
 
 	flag.Usage = func() { fmt.Fprint(os.Stderr, usage) }
@@ -91,6 +99,12 @@ Examples:
 	if help {
 		flag.Usage()
 		os.Exit(0)
+	}
+
+	if bypassLock && !readonly {
+		fmt.Fprintln(os.Stderr, "--bypass-lock can only be used with --readonly")
+		flag.Usage()
+		os.Exit(1)
 	}
 
 	// Get the non-flag arguments (database path)
@@ -109,7 +123,7 @@ Examples:
 		os.Exit(1)
 	}
 
-	return flag.Arg(0), readonly
+	return flag.Arg(0), readonly, bypassLock
 }
 
 // createDatabaseCompleter creates a dynamic completer for database keys
